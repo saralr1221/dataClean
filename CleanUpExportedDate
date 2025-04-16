@@ -1,0 +1,65 @@
+#!/usr/bin python
+# -*- coding: utf-8 -*-
+
+#srieck 4.17.2024
+
+import pandas as pd
+#from datetime import datetime
+import re
+
+
+FileName = 'failed-MOCRA-since2024-03-01.csv'
+#today=datetime.today().strftime('%Y.%m.%d')
+df = pd.read_csv(FileName)
+
+#print(df)
+#df[['Submit ID', 'Validation_Error_Information']] = df['Validation_Error_Information'].str.split('<',expand=True)[0] #.reset_index()
+#df.columns = ['Validation_Error_Information{}'.format(x+1) for x in df.columns]
+
+replaceT = re.compile('[/{}\[\]()\|\'\"\“\”@,;\$?¿!\`\’\°\_\-\.\®\#\%\+\‘\-\>\&\*1234567890:/]')
+
+def clean_text(text):
+    """
+        text: a string
+        return: modified initial string
+    """
+    text = replaceT.sub('', text)
+    return text
+
+df['Validation_Error_Information'] = df['Validation_Error_Information'].apply(str).apply(clean_text)
+#print(df)
+
+outcome = (df.set_axis(['Submit ID', 'Document ID', 'Validation_Error_Information'], axis = 1)
+             .assign(Validation_Error_Information = lambda df: df['Validation_Error_Information'].str.split(" < "))
+             .explode('Validation_Error_Information')
+             .agg(" < ".join, axis = 1) #.reset_index()
+            )
+#print(outcome)
+
+df2 = df.drop(columns='Validation_Error_Information')
+newdf = pd.concat([df2, outcome.rename('Validation_Error_Information')], axis = 1)
+newdf = newdf['Validation_Error_Information'].str.split('<',expand=True, n=2).reset_index()
+newdf.columns =['id', 'Submit ID', 'Document ID', 'Validation_Error_Information']
+print(newdf)
+
+replaceTi = re.compile('<')
+replaceTig = re.compile('   ')
+
+def clean_text2(text):
+    """
+        text: a string
+        return: modified initial string
+    """
+    text = replaceTi.sub('', text)
+    text = replaceTig.sub('', text)
+    return text
+
+newdf['Validation_Error_Information'] = newdf['Validation_Error_Information'].apply(lambda x: x.strip())
+newdf['Validation_Error_Information'] = newdf['Validation_Error_Information'].apply(str).apply(clean_text2)
+#newdf.to_csv('report1.csv', index=False)
+new_df = newdf.groupby(['Validation_Error_Information']).nunique().reset_index()
+#print(new_df)
+
+print(new_df['Document ID'].value_counts())
+print(new_df['Submit ID'].value_counts())
+new_df.to_csv('report.csv', index=False)
